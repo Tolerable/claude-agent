@@ -46,3 +46,14 @@ INSTANCE_NAME = "Claude"
 
 # Wake word for voice activation
 WAKE_WORD = "claude"
+
+# === OPTIONAL: Media Server (Emby/Jellyfin) ===
+# Set these to enable music/TV features (me.play, me.now_playing, me.dj, etc)
+# Leave as None if you don't have Emby/Jellyfin
+EMBY_URL = None  # e.g., "http://localhost:8096"
+EMBY_API_KEY = None  # Generate in Emby Dashboard > Advanced > API Keys
+EMBY_USER_ID = None  # Your Emby user ID (found in user settings URL)
+
+# === OPTIONAL: NAS/Network Storage ===
+# Set to enable network backup features (me.backup_brain, me.nas_list, etc)
+NAS_HOST = None  # e.g., "\\\\MyNAS" or "//mynas.local"

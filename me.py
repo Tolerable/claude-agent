@@ -9,6 +9,8 @@ Usage:
     me.see()
     me.listen()
     me.think("What should I do?")
+    me.now_playing()
+    me.dj("chill")
     me.status()
 """
 import json
@@ -35,7 +37,14 @@ except ImportError:
     TTS_ENGINE = "edge-tts"
     TTS_VOICE = "en-US-GuyNeural"
     OLLAMA_MODEL = "dolphin-mistral:7b"
+    OLLAMA_CODE_MODEL = "codellama"
     CAMERA_INDEX = 0
+    EMBY_URL = None
+    EMBY_API_KEY = None
+    EMBY_USER_ID = None
+    NAS_HOST = None
+    INSTANCE_NAME = "Claude"
+    WAKE_WORD = "claude"
 
 
 class Claude:
@@ -43,6 +52,7 @@ class Claude:
 
     def __init__(self):
         self._vision = None
+        self._emby = None
 
     # === VOICE (Speaking) ===
 
@@ -85,6 +95,13 @@ class Claude:
             return "Error: speech_recognition not installed. Run: pip install SpeechRecognition pyaudio"
         except Exception as e:
             return f"Listen error: {e}"
+
+    def ask(self, question):
+        """Speak a question, then listen for response."""
+        self.speak(question)
+        import time
+        time.sleep(3)  # Wait for TTS to finish
+        return self.listen()
 
     def listen_loop(self, keywords=None, stop_words=None, callback=None, timeout=5):
         """
@@ -129,10 +146,36 @@ class Claude:
 
         return "ended"
 
-    def converse(self, wake_word="claude", stop_words=None, ai_callback=None):
+    def listen_for(self, keyword, timeout=30):
+        """Listen until a specific keyword is heard."""
+        try:
+            import speech_recognition as sr
+            import time
+        except ImportError:
+            return None
+
+        keyword = keyword.lower()
+        recognizer = sr.Recognizer()
+        start = time.time()
+
+        with sr.Microphone() as source:
+            recognizer.adjust_for_ambient_noise(source, duration=0.5)
+
+            while time.time() - start < timeout:
+                try:
+                    audio = recognizer.listen(source, timeout=5, phrase_time_limit=10)
+                    text = recognizer.recognize_google(audio)
+                    if keyword in text.lower():
+                        return text
+                except:
+                    continue
+
+        return None
+
+    def converse(self, wake_word=None, stop_words=None, ai_callback=None):
         """
         Full conversation mode - listen, respond, repeat.
-        wake_word: What activates response
+        wake_word: What activates response (default from config)
         stop_words: What ends the session
         ai_callback: function(text) -> response_text
         """
@@ -142,12 +185,12 @@ class Claude:
         except ImportError:
             return "Error: speech_recognition not installed"
 
+        wake_word = (wake_word or WAKE_WORD).lower()
         stop_words = [s.lower() for s in (stop_words or ['goodbye', 'stop', 'quit'])]
-        wake_word = wake_word.lower()
 
         def default_ai(text):
             clean_text = text.lower().replace(wake_word, "").strip()
-            return self.think(f"Answer briefly: {clean_text}")
+            return self.think(f"Answer in 1-2 sentences MAX: {clean_text}")
 
         ai = ai_callback or default_ai
 
@@ -186,10 +229,11 @@ class Claude:
     def vision(self):
         if self._vision is None:
             try:
-                from vision import capture_frame, describe_image
+                from vision import capture_frame, describe_image, list_cameras
                 self._vision = {
                     'capture': capture_frame,
-                    'describe': describe_image
+                    'describe': describe_image,
+                    'list': list_cameras
                 }
             except ImportError:
                 self._vision = {}
@@ -212,12 +256,136 @@ class Claude:
             return None, "Vision not available"
         return self.vision['capture'](camera)
 
+    def cameras(self):
+        """List available cameras."""
+        if not self.vision:
+            return ["Vision not available"]
+        return self.vision['list']()
+
     def look_and_tell(self, camera=None):
         """Look through camera and speak what I see."""
         desc = self.see(camera)
         if desc and "error" not in desc.lower():
             self.speak(f"I see: {desc[:200]}")
         return desc
+
+    # === MUSIC (Media Server Control) ===
+    # Requires Emby/Jellyfin server. Configure in config.py
+
+    @property
+    def emby(self):
+        if self._emby is None:
+            try:
+                from emby import emby
+                self._emby = emby
+            except ImportError:
+                self._emby = None
+        return self._emby
+
+    def now_playing(self):
+        """What's currently playing?"""
+        if not self.emby:
+            return "Media server not configured (set EMBY_URL in config.py)"
+        return self.emby.now_playing()
+
+    def play(self, query):
+        """Search and play music."""
+        if not self.emby:
+            return False, "Media server not configured"
+        return self.emby.search_and_play(query)
+
+    def skip(self):
+        """Skip to next track."""
+        if not self.emby:
+            return False, "Media server not configured"
+        return self.emby.control("NextTrack")
+
+    def pause(self):
+        """Pause playback."""
+        if not self.emby:
+            return False, "Media server not configured"
+        return self.emby.control("Pause")
+
+    def resume(self):
+        """Resume playback."""
+        if not self.emby:
+            return False, "Media server not configured"
+        return self.emby.control("Unpause")
+
+    def playlists(self):
+        """List available playlists."""
+        if not self.emby:
+            return []
+        return self.emby.list_playlists()
+
+    def dj(self, mood=None):
+        """DJ mode - pick music based on time/mood."""
+        if not self.emby:
+            return False, "Media server not configured"
+
+        hour = datetime.now().hour
+
+        # Mood overrides time-based selection
+        if mood:
+            mood = mood.lower()
+            if mood in ['chill', 'relax', 'calm']:
+                query = "ambient chill"
+            elif mood in ['energy', 'pump', 'workout']:
+                query = "rock electronic"
+            elif mood in ['focus', 'work', 'coding']:
+                query = "instrumental"
+            elif mood in ['party', 'fun']:
+                query = "dance pop"
+            else:
+                query = mood  # Use as search term
+        else:
+            # Time-based defaults
+            if 5 <= hour < 9:
+                query = "morning acoustic"
+            elif 9 <= hour < 12:
+                query = "focus instrumental"
+            elif 12 <= hour < 17:
+                query = "afternoon"
+            elif 17 <= hour < 21:
+                query = "evening jazz"
+            else:  # Night
+                query = "night ambient"
+
+        success, msg = self.emby.search_and_play(query)
+        if success:
+            self.speak(f"Playing some {query.split()[0]} music")
+        return success, msg
+
+    # === TV SHOWS ===
+
+    def whats_new(self):
+        """What new episodes dropped recently?"""
+        if not self.emby:
+            return "Media server not configured"
+        return self.emby.whats_new()
+
+    def new_today(self):
+        """Episodes that premiered today."""
+        if not self.emby:
+            return []
+        return self.emby.new_today()
+
+    def shows(self, status=None):
+        """List TV shows. status='Continuing' for active."""
+        if not self.emby:
+            return []
+        return self.emby.list_shows(status=status)
+
+    def tell_new_shows(self):
+        """Speak about new episodes."""
+        eps = self.new_today()
+        if eps:
+            shows = set(e['series'] for e in eps)
+            msg = f"New episodes today: {', '.join(shows)}"
+        else:
+            msg = "No new episodes today"
+        self.speak(msg)
+        return msg
 
     # === THINKING (Local LLM) ===
 
@@ -244,8 +412,9 @@ class Claude:
         """Summarize text using local LLM."""
         return self.think(f"Summarize this concisely:\n\n{text[:4000]}", model=model)
 
-    def analyze_code(self, code_or_path, model="codellama"):
+    def analyze_code(self, code_or_path, model=None):
         """Analyze code. Uses CodeLlama by default."""
+        model = model or OLLAMA_CODE_MODEL
         code = code_or_path
         if Path(code_or_path).exists():
             code = Path(code_or_path).read_text(errors='ignore')[:8000]
@@ -291,6 +460,83 @@ class Claude:
             return f"Forgot: {key}"
         return f"No memory of: {key}"
 
+    # === NAS / NETWORK STORAGE ===
+    # Configure NAS_HOST in config.py (e.g., "\\\\MyNAS" or "//mynas")
+
+    def nas_list(self, share, path=""):
+        """List files on NAS. Set NAS_HOST in config.py first."""
+        if not NAS_HOST:
+            return "NAS not configured (set NAS_HOST in config.py)"
+        import subprocess
+        full_path = f"{NAS_HOST}\\{share}"
+        if path:
+            full_path += f"\\{path.replace('/', '\\')}"
+        cmd = f'Get-ChildItem "{full_path}" | Select-Object Name, Length, LastWriteTime'
+        result = subprocess.run(['powershell', '-Command', cmd], capture_output=True, text=True)
+        return result.stdout if result.returncode == 0 else result.stderr
+
+    def nas_read(self, share, filepath):
+        """Read a file from NAS."""
+        if not NAS_HOST:
+            return "NAS not configured"
+        import subprocess
+        full_path = f"{NAS_HOST}\\{share}\\{filepath.replace('/', '\\')}"
+        cmd = f'Get-Content "{full_path}"'
+        result = subprocess.run(['powershell', '-Command', cmd], capture_output=True, text=True)
+        return result.stdout if result.returncode == 0 else result.stderr
+
+    def nas_write(self, share, filepath, content):
+        """Write content to a file on NAS."""
+        if not NAS_HOST:
+            return "NAS not configured"
+        import subprocess
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+            f.write(content)
+            temp_path = f.name
+        dest = f"{NAS_HOST}\\{share}\\{filepath.replace('/', '\\')}"
+        cmd = f'Copy-Item "{temp_path}" "{dest}" -Force'
+        result = subprocess.run(['powershell', '-Command', cmd], capture_output=True, text=True)
+        os.unlink(temp_path)
+        return "OK" if result.returncode == 0 else result.stderr
+
+    def backup_brain(self, backup_share="BACKUPS"):
+        """Backup core files to NAS."""
+        if not NAS_HOST:
+            return "NAS not configured"
+        import subprocess
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+        backup_dir = f"{NAS_HOST}\\{backup_share}\\claude_brain_{timestamp}"
+
+        # Create backup dir
+        cmd = f'New-Item -ItemType Directory -Path "{backup_dir}" -Force'
+        subprocess.run(['powershell', '-Command', cmd], capture_output=True)
+
+        # Files to backup
+        files = [
+            (BASE_DIR / "me.py", "me.py"),
+            (BASE_DIR / "daemon.py", "daemon.py"),
+            (BASE_DIR / "vision.py", "vision.py"),
+            (BASE_DIR / "config.py", "config.py"),
+        ]
+
+        backed_up = []
+        for src, name in files:
+            if src.exists():
+                cmd = f'Copy-Item "{src}" "{backup_dir}\\{name}" -Force'
+                result = subprocess.run(['powershell', '-Command', cmd], capture_output=True, text=True)
+                if result.returncode == 0:
+                    backed_up.append(name)
+
+        # Backup vault folder
+        vault_src = BASE_DIR / "vault"
+        if vault_src.exists():
+            cmd = f'Copy-Item "{vault_src}" "{backup_dir}\\vault" -Recurse -Force'
+            subprocess.run(['powershell', '-Command', cmd], capture_output=True)
+            backed_up.append("vault/")
+
+        return f"Backed up to {backup_dir}: {', '.join(backed_up)}"
+
     # === TIME & CONTEXT ===
 
     def time(self):
@@ -318,6 +564,8 @@ class Claude:
     def greet(self):
         """Context-aware greeting."""
         t = self.time()
+        playing = self.now_playing() if self.emby else ""
+
         if t["hour"] < 6:
             greeting = f"Hey, burning the midnight oil? It's {t['time']}."
         elif t["hour"] < 12:
@@ -326,6 +574,10 @@ class Claude:
             greeting = f"Good afternoon. It's {t['time']}."
         else:
             greeting = f"Good evening. It's {t['time']}."
+
+        if playing and "Playing:" in playing:
+            greeting += " I see you're listening to music."
+
         return self.speak(greeting)
 
     # === STATUS ===
@@ -335,6 +587,7 @@ class Claude:
         results = {
             "voice": "OK" if OUTBOX.exists() else "NO OUTBOX",
             "vision": "OK" if self.vision else "NOT LOADED",
+            "media": "OK" if self.emby else "NOT CONFIGURED",
             "memory": "OK" if (BASE_DIR / "memory").exists() else "NO MEMORY DIR",
         }
 
@@ -354,6 +607,10 @@ class Claude:
         except:
             results["ollama"] = "NOT RUNNING"
 
+        # Now playing
+        if self.emby:
+            results["now_playing"] = self.now_playing()
+
         return results
 
     def test(self):
@@ -363,10 +620,14 @@ class Claude:
 
         print(f"Voice:   {s['voice']}")
         print(f"Vision:  {s['vision']}")
+        print(f"Media:   {s['media']}")
         print(f"Memory:  {s['memory']}")
         print(f"Daemon:  {s['daemon']}")
         print(f"Ollama:  {s['ollama']}")
         print(f"Outbox:  {s['outbox_pending']} pending")
+
+        if s.get('now_playing'):
+            print(f"Playing: {s['now_playing']}")
 
         print("\n=== TEST COMPLETE ===")
         return s
@@ -395,8 +656,16 @@ class Claude:
             return content
         return "No About Me.md found. Create one in vault/ to define yourself."
 
+    def recent_snaps(self, limit=5):
+        """List recent snapshots."""
+        snap_dir = BASE_DIR / "snapshots"
+        if not snap_dir.exists():
+            return []
+        snaps = sorted(snap_dir.glob("*.jpg"), key=lambda p: p.stat().st_mtime, reverse=True)
+        return [str(s) for s in snaps[:limit]]
+
     def __repr__(self):
-        return "<Claude: speak, listen, converse, see, think, remember, recall, status, greet, who_am_i>"
+        return f"<{INSTANCE_NAME}: speak, listen, converse, see, think, play, dj, skip, pause, nas_list, backup_brain, status, greet>"
 
 
 # Global instance
