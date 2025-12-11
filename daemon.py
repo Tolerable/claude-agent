@@ -1168,7 +1168,7 @@ def autonomous_reflection():
     if memory_engine:
         try:
             lessons = memory_engine._execute(
-                "SELECT content FROM lessons ORDER BY created_at DESC LIMIT 3",
+                "SELECT text FROM lessons ORDER BY created_at DESC LIMIT 3",
                 fetch=True
             )
             if lessons:

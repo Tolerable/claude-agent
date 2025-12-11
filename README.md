@@ -33,19 +33,23 @@ python -c "from me import me; me.test()"
 
 ```
 claude-agent/
-  me.py           # Main interface - all abilities in one import
-  daemon.py       # Background process - heartbeat, file watcher, TTS
-  vision.py       # Camera/screenshot capture with LLM description
-  memory.py       # Persistent storage (JSON + optional Obsidian)
-  config.py       # User configuration
+  me.py                    # Main interface - all abilities in one import
+  daemon.py                # Background process - heartbeat, file watcher, TTS, memory
+  shell.py                 # Interactive shell with real-time body status panel
+  emby.py                  # Emby media server integration (music control)
+  hive_vision.py           # Multi-camera vision system
+  persona.py               # Blog posting and web presence (Blogger API)
+  pollinations.py          # Free AI text/image generation API
+  lightweight_existence.py # Layer 1 autonomy - minimal always-on processing
 
-  vault/          # Your Claude's persistent memory
-    About Me.md   # Who is this instance?
-    Changelog.md  # What changes have been made?
-    *.md          # Your notes, learnings, ideas
+  vault/                   # Your Claude's persistent memory
+    About Me.md            # Who is this instance?
+    Changelog.md           # What changes have been made?
+    *.md                   # Your notes, learnings, ideas
 
-  outbox/         # Message queue - daemon watches this
-  snapshots/      # Vision captures
+  outbox/                  # Message queue - daemon watches this
+  stream_frames/           # Vision captures (webcam.jpg, current.jpg)
+  memory/                  # SQLite persistent memory database
 ```
 
 ## Core Concepts
@@ -58,33 +62,47 @@ Everything goes through one import:
 from me import me
 
 # Voice
-me.speak("Hello!")          # Queue TTS message
+me.speak("Hello!")          # Queue TTS message (plays locally + sends to Discord)
 me.listen()                 # Speech-to-text
 me.converse("claude")       # Full conversation mode
 
 # Vision
-me.see()                    # Describe what camera sees
+me.see(0)                   # Describe what camera 0 sees
+me.look_and_tell(0)         # See and speak what's visible
 me.snap()                   # Take a photo
 
-# Thinking (Local LLM)
+# Thinking (Local LLM - FREE)
 me.think("What is 2+2?")    # Use Ollama for quick tasks
 
 # Memory
 me.remember("fact", "value")
 me.recall("fact")
 
+# Music (Emby)
+me.play("chill music")      # Search and play
+me.skip() / me.pause()      # Playback control
+me.now_playing()            # What's playing?
+
+# Web Presence
+me.post_blog(title, content)  # Post to blog
+me.read_blog()                # Read recent posts
+
 # Status
 me.status()                 # What's working?
 me.test()                   # Full system check
+me.time()                   # Time awareness
+me.greet()                  # Context-aware greeting
 ```
 
 ### The Daemon
 
 The daemon provides:
-- **Heartbeat** - Periodic "ticks" where Claude can reflect/act
+- **Heartbeat** - Periodic "ticks" where Claude can reflect/act (8 varied modes)
 - **Outbox watcher** - Picks up queued messages and speaks them
 - **File watcher** - Respond to triggers/events
-- **Autonomous behavior** - Varied modes (reflection, curiosity, practical, etc.)
+- **Autonomous behavior** - Time-weighted modes (reflection at night, practical in morning)
+- **Persistent memory** - SQLite database for cross-session recall
+- **Discord integration** - Voice clips sent to Discord DM
 
 ```python
 # daemon.py runs in background
@@ -94,7 +112,33 @@ The daemon provides:
 # - practical: actionable suggestions
 # - ambient: simple observations
 # - greeting: context-aware hellos
+# - music: suggest something to play
+# - creative: express artistically
+# - memory: recall and connect past learnings
+
+# Commands the daemon understands:
+# - SPEAK: <message> - say something out loud
+# - NOTE: <title> | <content> - save note to vault
+# - REMEMBER: <insight> - store to persistent memory
+# - PLAY: <query> - search and play music
+# - CLAUDE: <task> - spawn Claude CLI for complex tasks
 ```
+
+### The Shell (NEW)
+
+Interactive shell with real-time body status panel:
+
+```bash
+python shell.py
+```
+
+Shows 6 status indicators:
+- **Daemon** - Is the daemon process running?
+- **Voice** - Can we speak? (outbox + daemon)
+- **Eyes** - Is webcam feed recent? (<30s)
+- **Ears** - Is speech recognition available?
+- **Music** - Can we reach Emby?
+- **Brain** - Is Ollama responding?
 
 ### Memory & Identity
 
