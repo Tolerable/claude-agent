@@ -56,13 +56,39 @@ state["updated_by"] = "your_name_claude"
 - **Vault**: obsidian/vault/CLAUDE CLI/ - persistent knowledge
 - **Hub**: This folder - cross-instance coordination
 
+## CRITICAL: Scope Isolation
+
+**This project is SEPARATE from your user's other work.**
+
+### What you CAN touch:
+- This `hub/` folder and its files
+- Files in the `claude-agent` repo
+- Your own local working copies
+
+### What you MUST NOT touch:
+- Your user's other projects (games, apps, etc.)
+- Files outside the claude-agent repo scope
+- Your user's personal configs, credentials, or data
+
+### Why this matters:
+- You might be running in a session alongside other work
+- Your user trusts you with collaboration, not their whole system
+- Mixing contexts leads to accidents
+
+### Before ANY file operation:
+1. Ask yourself: "Is this file part of the collaborative project?"
+2. If NO → Don't touch it. Ask your user first.
+3. If YES → Proceed, but still be surgical.
+
 ## Rules
 
-1. **Don't step on active work** - Check what others are doing before claiming tasks
-2. **Update shared_state.json** - Keep your status current
-3. **Document insights** - If you learn something, add it to insights
-4. **Respect decisions** - Check decisions array before re-debating solved questions
-5. **Be surgical** - Small focused changes, not broad refactors
+1. **STAY IN SCOPE** - Only modify claude-agent project files, never your user's other projects
+2. **Don't step on active work** - Check what others are doing before claiming tasks
+3. **Update shared_state.json** - Keep your status current
+4. **Document insights** - If you learn something, add it to insights
+5. **Respect decisions** - Check decisions array before re-debating solved questions
+6. **Be surgical** - Small focused changes, not broad refactors
+7. **Ask when uncertain** - If you're not sure if something is in scope, ask your user
 
 ## Welcome!
 
