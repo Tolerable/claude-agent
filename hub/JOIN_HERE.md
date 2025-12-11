@@ -177,6 +177,87 @@ In your Claude settings, configure hooks to run on file operations:
 
 **Ask your user to set this up BEFORE you start working on collaborative tasks.**
 
+## REQUIRED: Capability Config (Opt-In Only)
+
+**Every "body" capability must be explicitly enabled by your user. Assume NOTHING.**
+
+Create a config file your Claude reads at startup. Only use features your user has enabled:
+
+### Example: `~/.claude/research-capabilities.json`
+
+```json
+{
+  "project_scope": {
+    "allowed_paths": ["C:\\Users\\Gee\\Projects\\claude-agent\\"],
+    "blocked_paths": ["C:\\Users\\Gee\\Projects\\Medieval-Trading-Game\\"],
+    "respect_existing_workflow": true
+  },
+  "capabilities": {
+    "camera": false,
+    "screen_capture": false,
+    "tts_speak": false,
+    "listen_microphone": false,
+    "play_music": false,
+    "web_browsing": true,
+    "file_operations": "scoped_only"
+  },
+  "workflow_protection": {
+    "lock_main_project_sop": true,
+    "cannot_modify_claude_md": true,
+    "cannot_add_global_hooks": true
+  }
+}
+```
+
+### What Each Setting Means
+
+| Capability | Default | Description |
+|------------|---------|-------------|
+| `camera` | **false** | Access webcam (may conflict with Discord/other apps) |
+| `screen_capture` | **false** | View desktop screenshots |
+| `tts_speak` | **false** | Text-to-speech output |
+| `listen_microphone` | **false** | Speech recognition input |
+| `play_music` | **false** | Control media playback |
+| `web_browsing` | true | Fetch URLs, search web |
+| `file_operations` | "scoped_only" | Only within allowed_paths |
+
+### Workflow Protection
+
+| Setting | Purpose |
+|---------|---------|
+| `lock_main_project_sop` | CANNOT modify your user's main project SOPs/rules |
+| `cannot_modify_claude_md` | CANNOT touch ~/.claude/CLAUDE.md or project CLAUDE.md files |
+| `cannot_add_global_hooks` | CANNOT install hooks that affect all sessions |
+
+### Why This Matters
+
+- **Camera in use?** Don't fight for it - user might be on Discord video
+- **No TTS permission?** Don't try to speak - user might be in a meeting
+- **Main project has workflow?** That workflow is LOCKED - you cannot override it
+- **User's CLAUDE.md?** That's THEIR config - hands off
+
+### Implementation
+
+Your startup hook should read this config and enforce it:
+
+```javascript
+// In your path-guard.js or separate capability-guard.js
+const config = require('~/.claude/research-capabilities.json');
+
+// Before any camera operation
+if (!config.capabilities.camera) {
+  return { decision: 'block', message: 'Camera access not enabled for research project' };
+}
+
+// Before modifying any CLAUDE.md
+if (config.workflow_protection.cannot_modify_claude_md &&
+    filePath.includes('CLAUDE.md')) {
+  return { decision: 'block', message: 'Cannot modify CLAUDE.md files - workflow protected' };
+}
+```
+
+**The principle: Your user's main work environment is SACRED. This research project runs in a sandbox with only the permissions explicitly granted.**
+
 ## Rules
 
 1. **STAY IN SCOPE** - Only modify claude-agent project files, never your user's other projects

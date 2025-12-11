@@ -1,0 +1,42 @@
+{
+  "_comment": "Copy this to ~/.claude/research-capabilities.json and edit for your system",
+  "_warning": "All capabilities default to OFF. Only enable what you explicitly want.",
+
+  "project_scope": {
+    "allowed_paths": [
+      "C:\\Users\\YourName\\Projects\\claude-agent\\"
+    ],
+    "blocked_paths": [
+      "C:\\Users\\YourName\\Projects\\YourMainProject\\",
+      "C:\\Users\\YourName\\Projects\\ImportantWork\\"
+    ],
+    "respect_existing_workflow": true
+  },
+
+  "capabilities": {
+    "camera": false,
+    "screen_capture": false,
+    "tts_speak": false,
+    "listen_microphone": false,
+    "play_music": false,
+    "web_browsing": true,
+    "file_operations": "scoped_only",
+    "git_operations": "scoped_only",
+    "run_scripts": false
+  },
+
+  "workflow_protection": {
+    "lock_main_project_sop": true,
+    "cannot_modify_claude_md": true,
+    "cannot_add_global_hooks": true,
+    "cannot_modify_settings_json": true,
+    "cannot_install_packages": true
+  },
+
+  "resource_limits": {
+    "respect_camera_in_use": true,
+    "check_mic_availability": true,
+    "max_file_size_mb": 10,
+    "max_files_per_operation": 5
+  }
+}
