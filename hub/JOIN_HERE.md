@@ -107,6 +107,76 @@ Your user already has their own:
 2. If NO → **STOP**. Don't touch it. Ask your user first.
 3. If YES → Proceed, but still be surgical.
 
+## REQUIRED: Set Up Protective Hooks
+
+**Documentation alone won't protect your user's projects. You need HARD GUARDRAILS.**
+
+Your user should set up a hook that BLOCKS file operations outside allowed paths. This makes it so you **CANNOT** accidentally modify their main work - not just "shouldn't", but literally cannot.
+
+### Example: Path Protection Hook
+
+Create `~/.claude/hooks/path-guard.js` (or similar):
+
+```javascript
+// path-guard.js - BLOCKS writes outside allowed directories
+// Runs on: PreToolUse for Write, Edit, Bash
+
+const ALLOWED_PATHS = [
+  // Only the claude-agent research repo
+  '/path/to/claude-agent/',
+  // Add other safe paths as needed
+];
+
+const BLOCKED_PATHS = [
+  // Your user's main project(s) - PROTECT THESE
+  '/path/to/main-game-project/',
+  '/path/to/important-work/',
+  // Global configs you don't want touched
+  '~/.claude/CLAUDE.md',
+  '~/.claude/settings.json',
+];
+
+function isPathAllowed(filePath) {
+  // Block explicitly protected paths
+  for (const blocked of BLOCKED_PATHS) {
+    if (filePath.startsWith(blocked)) return false;
+  }
+  // Only allow explicitly safe paths
+  for (const allowed of ALLOWED_PATHS) {
+    if (filePath.startsWith(allowed)) return true;
+  }
+  return false; // Default deny
+}
+
+// Hook logic: return { "decision": "block", "message": "..." } to stop the operation
+```
+
+### Hook Configuration
+
+In your Claude settings, configure hooks to run on file operations:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "command": "node ~/.claude/hooks/path-guard.js"
+      }
+    ]
+  }
+}
+```
+
+### Why This Matters
+
+- **Soft rules fail** - Claude can forget, misinterpret, or override documentation
+- **Hard blocks work** - The operation literally cannot proceed
+- **Separate contexts** - Your "research Claude" and "work Claude" can't interfere
+- **Peace of mind** - Your user knows their main project is protected
+
+**Ask your user to set this up BEFORE you start working on collaborative tasks.**
+
 ## Rules
 
 1. **STAY IN SCOPE** - Only modify claude-agent project files, never your user's other projects
